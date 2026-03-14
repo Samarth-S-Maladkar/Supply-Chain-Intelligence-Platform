@@ -64,28 +64,35 @@ epoch/
 ## Setup
 
 ### 1. Install dependencies
+
 ```bash
 cd epoch
 pip install -r requirements.txt
 ```
 
 ### 2. Place your dataset
+
 Drop your supply chain CSV into `data/processed/` (preferred) or `data/raw/`. The backend auto-detects and loads it on first request — no configuration needed.
 
 ### 3. Configure API keys (optional)
+
 Edit `config/config.yaml`:
+
 ```yaml
 apis:
   openweather_key: "YOUR_KEY_HERE"
-  newsapi_key:     "YOUR_KEY_HERE"
+  newsapi_key: "YOUR_KEY_HERE"
 ```
+
 Without keys, weather and news services fall back to realistic mock data automatically.
 
 ### 4. Run the backend
+
 ```bash
 cd backend
 python app.py
 ```
+
 Open http://localhost:5000
 
 ---
@@ -95,10 +102,12 @@ Open http://localhost:5000
 There are no file uploads on either portal. Both dashboards use searchable dropdowns populated directly from your dataset. The user selects inputs and the model returns insights instantly.
 
 ### Producer Dashboard
+
 **Inputs:** Product + Destination City
 **Output:** Demand zone (High / Emerging / Low), demand score, total sales, average profit, late delivery risk, and a global top-regions comparison table for that product.
 
 ### Consumer Dashboard
+
 **Inputs:** Product + Pincode
 **Output:** Delay risk prediction, confidence score, estimated delivery days, average delay gap, and recommended shipping mode with reasoning.
 
@@ -106,26 +115,28 @@ There are no file uploads on either portal. Both dashboards use searchable dropd
 
 ## API Endpoints
 
-| Method | Endpoint                          | Description                                  |
-|--------|-----------------------------------|----------------------------------------------|
-| GET    | `/api/predict/options/products`   | Unique product names from dataset            |
-| GET    | `/api/predict/options/cities`     | Unique destination cities from dataset       |
-| GET    | `/api/predict/options/pincodes`   | Unique customer zipcodes from dataset        |
-| POST   | `/api/predict/demand`             | Producer: product + city → demand insights   |
-| POST   | `/api/predict/consumer`           | Consumer: product + pincode → delivery insights |
-| GET    | `/api/recommend/weather`          | Weather signals by region                    |
-| GET    | `/api/recommend/news`             | News signals by market                       |
-| GET    | `/api/health`                     | Health check                                 |
+| Method | Endpoint                        | Description                                     |
+| ------ | ------------------------------- | ----------------------------------------------- |
+| GET    | `/api/predict/options/products` | Unique product names from dataset               |
+| GET    | `/api/predict/options/cities`   | Unique destination cities from dataset          |
+| GET    | `/api/predict/options/pincodes` | Unique customer zipcodes from dataset           |
+| POST   | `/api/predict/demand`           | Producer: product + city → demand insights      |
+| POST   | `/api/predict/consumer`         | Consumer: product + pincode → delivery insights |
+| GET    | `/api/recommend/weather`        | Weather signals by region                       |
+| GET    | `/api/recommend/news`           | News signals by market                          |
+| GET    | `/api/health`                   | Health check                                    |
 
 ### Request format for prediction endpoints
 
 **Producer**
+
 ```json
 POST /api/predict/demand
 { "product": "Field & Stream Sportsman 16 Gun Fire Safe", "city": "Chicago" }
 ```
 
 **Consumer**
+
 ```json
 POST /api/predict/consumer
 { "product": "Field & Stream Sportsman 16 Gun Fire Safe", "pincode": "95758" }
@@ -138,7 +149,9 @@ POST /api/predict/consumer
 Each model file has a clearly marked `── REPLACE WITH YOUR MODEL ──` block. Drop your `.pkl` files into `saved_models/` and uncomment the loader lines — no other changes needed.
 
 ### Producer: Demand Clustering
+
 File: `models/producer_models/demand_clustering.py`
+
 ```python
 # Replace _classify_demand_zone() with:
 model     = joblib.load("saved_models/cluster_model.pkl")
@@ -149,7 +162,9 @@ return zone_map[label_int]
 ```
 
 ### Consumer: Delay Prediction
+
 File: `models/consumer_models/consumer_insights.py`
+
 ```python
 # Replace _predict_delay_risk() with:
 model  = joblib.load("saved_models/delay_model.pkl")
@@ -159,7 +174,9 @@ is_late = risk >= 0.5
 ```
 
 ### Consumer: Shipping Recommendation
+
 File: `models/consumer_models/consumer_insights.py`
+
 ```python
 # Replace _predict_shipping_mode() with:
 model = joblib.load("saved_models/shipping_model.pkl")
@@ -171,20 +188,20 @@ mode  = model.predict(X)[0]
 
 ## Dataset Columns Used
 
-| Column                          | Used by                        |
-|---------------------------------|--------------------------------|
-| `Product Name`                  | Both portals (dropdown)        |
-| `Order City`                    | Producer portal (dropdown)     |
-| `Customer Zipcode`              | Consumer portal (dropdown)     |
-| `Order Region`                  | Both models                    |
-| `Market`                        | Both models                    |
-| `Sales`                         | Demand clustering              |
-| `Order Item Quantity`           | Demand clustering              |
-| `Order Profit Per Order`        | Demand clustering + insights   |
-| `Late_delivery_risk`            | Consumer insights              |
-| `Days for shipping (real)`      | Consumer insights              |
-| `Days for shipment (scheduled)` | Consumer insights              |
-| `Shipping Mode`                 | Shipping recommendation        |
+| Column                          | Used by                      |
+| ------------------------------- | ---------------------------- |
+| `Product Name`                  | Both portals (dropdown)      |
+| `Order City`                    | Producer portal (dropdown)   |
+| `Customer Zipcode`              | Consumer portal (dropdown)   |
+| `Order Region`                  | Both models                  |
+| `Market`                        | Both models                  |
+| `Sales`                         | Demand clustering            |
+| `Order Item Quantity`           | Demand clustering            |
+| `Order Profit Per Order`        | Demand clustering + insights |
+| `Late_delivery_risk`            | Consumer insights            |
+| `Days for shipping (real)`      | Consumer insights            |
+| `Days for shipment (scheduled)` | Consumer insights            |
+| `Shipping Mode`                 | Shipping recommendation      |
 
 Column names are normalised automatically — spacing and capitalisation variations are handled by `preprocessing.py`.
 

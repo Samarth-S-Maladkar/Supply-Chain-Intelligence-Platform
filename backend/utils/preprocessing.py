@@ -74,7 +74,17 @@ def load_and_clean_csv(filepath: str) -> pd.DataFrame:
     Load CSV, normalise column names, cast types, drop PII columns.
     Returns a clean DataFrame ready for feature engineering or prediction.
     """
-    df = pd.read_csv(filepath, encoding="utf-8", on_bad_lines="skip")
+    df = None
+    last_error = None
+    for enc in ["utf-8", "latin1", "ISO-8859-1"]:
+        try:
+            df = pd.read_csv(filepath, encoding=enc, on_bad_lines="skip")
+            break
+        except Exception as e:
+            last_error = e
+
+    if df is None:
+        raise ValueError(f"Could not read CSV '{filepath}': {last_error}")
 
     # Normalise column names
     rename = {}

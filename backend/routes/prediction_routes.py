@@ -29,22 +29,51 @@ def _get_dataset():
     import pandas as pd
     from backend.utils.preprocessing import load_and_clean_csv
 
-    for folder in ["data/processed", "data/raw"]:
-        folder_path = os.path.join(ROOT, folder)
+    def _iter_csv_paths(base_folder: str):
+        folder_path = os.path.join(ROOT, base_folder)
         if not os.path.isdir(folder_path):
-            continue
-        for fname in sorted(os.listdir(folder_path)):
-            if fname.endswith(".csv"):
-                try:
-                    df = load_and_clean_csv(os.path.join(folder_path, fname))
-                    _dataset_cache = df
-                    return df
-                except Exception:
-                    continue
+            return []
+        csv_paths = []
+        for dirpath, _, filenames in os.walk(folder_path):
+            for fname in sorted(filenames):
+                if fname.lower().endswith(".csv"):
+                    csv_paths.append(os.path.join(dirpath, fname))
+        return sorted(csv_paths)
+
+    expected_cols = [
+        "Product_Name",
+        "Order_Region",
+        "Order_Item_Quantity",
+        "Order_Profit_Per_Order",
+        "Sales",
+        "Category_Name",
+        "Market",
+        "Order_City",
+    ]
+
+    candidates = []
+    for folder in ["data/processed", "data/raw"]:
+        for csv_path in _iter_csv_paths(folder):
+            try:
+                df = load_and_clean_csv(csv_path)
+            except Exception:
+                continue
+
+            col_score = sum(1 for c in expected_cols if c in df.columns)
+            name_score = 1 if "supplychain" in os.path.basename(csv_path).lower() else 0
+            total_score = (col_score * 10) + name_score
+            candidates.append((total_score, len(df), csv_path, df))
+
+    if candidates:
+        candidates.sort(key=lambda x: (x[0], x[1]), reverse=True)
+        best_score, _, _, best_df = candidates[0]
+        if best_score > 0:
+            _dataset_cache = best_df
+            return best_df
 
     raise FileNotFoundError(
-        "No CSV found in data/processed/ or data/raw/. "
-        "Place your dataset CSV there and restart."
+        "No compatible CSV found in data/processed/ or data/raw/. "
+        "Place the supply chain dataset CSV there (subfolders are supported) and restart."
     )
 
 
@@ -96,6 +125,15 @@ def get_pincodes():
 
 
 # ── Producer: demand insight ──────────────────────────────────────────────────
+
+@prediction_bp.route("/producer-overview", methods=["GET"])
+def producer_overview():
+    try:
+        df = _get_dataset()
+        from models.producer_models.demand_clustering import predict_overview
+        return jsonify(predict_overview(df))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @prediction_bp.route("/demand", methods=["POST"])
 def predict_demand():

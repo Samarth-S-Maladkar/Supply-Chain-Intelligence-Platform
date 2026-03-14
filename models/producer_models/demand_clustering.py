@@ -78,6 +78,210 @@ def _get_top_regions_for_product(df: pd.DataFrame, product_col: str, product: st
     return rows
 
 
+def _build_region_category_heatmap(df: pd.DataFrame, product_col: str, product: str) -> dict:
+    """Build heatmap data: rows=regions, cols=categories, values=order quantity sum."""
+    if "Order_Region" not in df.columns:
+        return {"rows": [], "columns": [], "values": []}
+
+    category_col = "Category_Name" if "Category_Name" in df.columns else None
+    qty_col = "Order_Item_Quantity" if "Order_Item_Quantity" in df.columns else None
+    if not category_col or not qty_col:
+        return {"rows": [], "columns": [], "values": []}
+
+    prod_df = df[df[product_col].astype(str).str.lower() == product.lower()].copy()
+    if prod_df.empty:
+        return {"rows": [], "columns": [], "values": []}
+
+    pivot = (
+        prod_df
+        .pivot_table(
+            values=qty_col,
+            index="Order_Region",
+            columns=category_col,
+            aggfunc="sum",
+            fill_value=0,
+        )
+        .sort_index()
+    )
+
+    if pivot.empty:
+        return {"rows": [], "columns": [], "values": []}
+
+    column_totals = pivot.sum(axis=0).sort_values(ascending=False)
+    top_columns = column_totals.head(10).index.tolist()
+    pivot = pivot[top_columns]
+
+    row_totals = pivot.sum(axis=1).sort_values(ascending=False)
+    top_rows = row_totals.head(10).index.tolist()
+    pivot = pivot.loc[top_rows]
+
+    values = [[float(v) for v in row] for row in pivot.values.tolist()]
+    return {
+        "rows": [str(r) for r in pivot.index.tolist()],
+        "columns": [str(c) for c in pivot.columns.tolist()],
+        "values": values,
+    }
+
+
+def _get_high_demand_low_profit_regions(df: pd.DataFrame, product_col: str, product: str) -> list:
+    """Return top-10 regions with high demand quantity and lower average profit."""
+    if "Order_Region" not in df.columns:
+        return []
+
+    qty_col = "Order_Item_Quantity" if "Order_Item_Quantity" in df.columns else None
+    profit_col = "Order_Profit_Per_Order" if "Order_Profit_Per_Order" in df.columns else None
+    sales_col = "Sales" if "Sales" in df.columns else None
+    if not qty_col or not profit_col:
+        return []
+
+    prod_df = df[df[product_col].astype(str).str.lower() == product.lower()].copy()
+    if prod_df.empty:
+        return []
+
+    grouped = (
+        prod_df
+        .groupby("Order_Region", as_index=False)
+        .agg(
+            total_quantity=(qty_col, "sum"),
+            avg_profit_per_order=(profit_col, "mean"),
+            total_sales=(sales_col, "sum") if sales_col else (qty_col, "count"),
+            order_count=(qty_col, "count"),
+        )
+    )
+
+    if grouped.empty:
+        return []
+
+    grouped = grouped.sort_values(
+        ["total_quantity", "avg_profit_per_order"],
+        ascending=[False, True],
+    ).head(10)
+
+    rows = []
+    for rank, (_, row) in enumerate(grouped.iterrows(), start=1):
+        rows.append({
+            "rank": rank,
+            "region": str(row["Order_Region"]),
+            "total_quantity": int(row["total_quantity"]),
+            "avg_profit_per_order": round(float(row["avg_profit_per_order"]), 2),
+            "total_sales": round(float(row["total_sales"]), 2),
+            "order_count": int(row["order_count"]),
+        })
+    return rows
+
+
+def _build_region_category_heatmap_overview(df: pd.DataFrame) -> dict:
+    """Build overview heatmap data: rows=regions, cols=categories, values=order quantity sum."""
+    if "Order_Region" not in df.columns:
+        return {"rows": [], "columns": [], "values": []}
+
+    category_col = "Category_Name" if "Category_Name" in df.columns else None
+    qty_col = "Order_Item_Quantity" if "Order_Item_Quantity" in df.columns else None
+    if not category_col or not qty_col:
+        return {"rows": [], "columns": [], "values": []}
+
+    pivot = (
+        df
+        .pivot_table(
+            values=qty_col,
+            index="Order_Region",
+            columns=category_col,
+            aggfunc="sum",
+            fill_value=0,
+        )
+        .sort_index()
+    )
+
+    if pivot.empty:
+        return {"rows": [], "columns": [], "values": []}
+
+    column_totals = pivot.sum(axis=0).sort_values(ascending=False)
+    pivot = pivot[column_totals.head(10).index.tolist()]
+    row_totals = pivot.sum(axis=1).sort_values(ascending=False)
+    pivot = pivot.loc[row_totals.head(10).index.tolist()]
+
+    values = [[float(v) for v in row] for row in pivot.values.tolist()]
+    return {
+        "rows": [str(r) for r in pivot.index.tolist()],
+        "columns": [str(c) for c in pivot.columns.tolist()],
+        "values": values,
+    }
+
+
+def _get_high_demand_low_profit_regions_overview(df: pd.DataFrame) -> list:
+    """Return top-10 regions with high demand quantity and lower average profit from full dataset."""
+    if "Order_Region" not in df.columns:
+        return []
+
+    qty_col = "Order_Item_Quantity" if "Order_Item_Quantity" in df.columns else None
+    profit_col = "Order_Profit_Per_Order" if "Order_Profit_Per_Order" in df.columns else None
+    sales_col = "Sales" if "Sales" in df.columns else None
+    if not qty_col or not profit_col:
+        return []
+
+    grouped = (
+        df
+        .groupby("Order_Region", as_index=False)
+        .agg(
+            total_quantity=(qty_col, "sum"),
+            avg_profit_per_order=(profit_col, "mean"),
+            total_sales=(sales_col, "sum") if sales_col else (qty_col, "count"),
+            order_count=(qty_col, "count"),
+        )
+    )
+
+    if grouped.empty:
+        return []
+
+    grouped = grouped.sort_values(
+        ["total_quantity", "avg_profit_per_order"],
+        ascending=[False, True],
+    ).head(10)
+
+    rows = []
+    for rank, (_, row) in enumerate(grouped.iterrows(), start=1):
+        rows.append({
+            "rank": rank,
+            "region": str(row["Order_Region"]),
+            "total_quantity": int(row["total_quantity"]),
+            "avg_profit_per_order": round(float(row["avg_profit_per_order"]), 2),
+            "total_sales": round(float(row["total_sales"]), 2),
+            "order_count": int(row["order_count"]),
+        })
+    return rows
+
+
+def _get_top_regions_overview(df: pd.DataFrame) -> list:
+    """Return top regions by overall demand score across the full dataset."""
+    if "Order_Region" not in df.columns:
+        return []
+
+    feat_df = build_producer_features(df.copy())
+    if "demand_score" not in feat_df.columns:
+        return []
+
+    region_agg = feat_df.groupby("Order_Region", as_index=False).agg(
+        demand_score=("demand_score", "mean"),
+        total_sales=("Sales", "sum") if "Sales" in feat_df.columns else ("demand_score", "count"),
+        order_count=("demand_score", "count"),
+    ).sort_values("demand_score", ascending=False).head(10)
+
+    all_scores = region_agg["demand_score"]
+    low_t = float(all_scores.quantile(0.33)) if len(all_scores) >= 3 else 0.33
+    high_t = float(all_scores.quantile(0.67)) if len(all_scores) >= 3 else 0.67
+
+    rows = []
+    for _, row in region_agg.iterrows():
+        rows.append({
+            "region": row["Order_Region"],
+            "demand_score": round(float(row["demand_score"]), 3),
+            "demand_zone": _classify_demand_zone(row["demand_score"], low_t, high_t),
+            "total_sales": round(float(row["total_sales"]), 2),
+            "order_count": int(row["order_count"]),
+        })
+    return rows
+
+
 # ── Main entry point ──────────────────────────────────────────────────────────
 
 def predict_for_product_city(df: pd.DataFrame, product: str, city: str) -> dict:
@@ -162,6 +366,8 @@ def predict_for_product_city(df: pd.DataFrame, product: str, city: str) -> dict:
 
     # ── Top regions globally for this product ──
     top_regions = _get_top_regions_for_product(df, product_col, product)
+    heatmap = _build_region_category_heatmap(df, product_col, product)
+    high_demand_low_profit_top10 = _get_high_demand_low_profit_regions(df, product_col, product)
 
     return {
         "found":         found,
@@ -176,6 +382,17 @@ def predict_for_product_city(df: pd.DataFrame, product: str, city: str) -> dict:
         "avg_late_risk": round(avg_late_risk, 3),
         "order_count":   order_count,
         "top_regions":   top_regions,
+        "heatmap":       heatmap,
+        "high_demand_low_profit_top10": high_demand_low_profit_top10,
         "data_source":   "city-matched" if found else "product-only",
         "message":       None if found else f"No exact city match — showing product-level data for '{product}'.",
+    }
+
+
+def predict_overview(df: pd.DataFrame) -> dict:
+    """Producer overview analytics for full dataset (no product/city inputs)."""
+    return {
+        "heatmap": _build_region_category_heatmap_overview(df),
+        "high_demand_low_profit_top10": _get_high_demand_low_profit_regions_overview(df),
+        "top_regions": _get_top_regions_overview(df),
     }
