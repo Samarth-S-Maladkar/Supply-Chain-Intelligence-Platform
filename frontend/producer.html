@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>epoch — Producer Dashboard</title>
+<link rel="stylesheet" href="styles.css"/>
+<style>
+  .eyebrow{color:var(--P)}
+  .stat-card .value{color:var(--P)}
+
+  /* Query form */
+  .query-card{
+    background:var(--surface);border:1px solid var(--border);
+    border-radius:var(--radius-lg);padding:32px 36px;margin-bottom:36px;
+  }
+  .query-card h3{
+    font-family:'Syne',sans-serif;font-size:16px;font-weight:700;
+    margin-bottom:6px;
+  }
+  .query-card > p{font-size:13px;color:var(--muted);margin-bottom:28px}
+
+  .input-row{display:grid;grid-template-columns:1fr 1fr auto;gap:14px;align-items:end}
+  @media(max-width:680px){.input-row{grid-template-columns:1fr}}
+
+  .field{display:flex;flex-direction:column;gap:8px}
+  .field label{font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+
+  .select-wrap{position:relative}
+  .select-wrap svg{
+    position:absolute;right:12px;top:50%;transform:translateY(-50%);
+    width:14px;height:14px;stroke:var(--muted);pointer-events:none;
+  }
+  select,input[type="text"]{
+    width:100%;height:42px;
+    background:var(--surface2);border:1px solid var(--border);
+    border-radius:var(--radius-sm);
+    padding:0 36px 0 14px;
+    font-family:'DM Sans',sans-serif;font-size:13.5px;color:var(--text);
+    appearance:none;-webkit-appearance:none;outline:none;
+    transition:border-color .15s;cursor:pointer;
+  }
+  select:hover,input[type="text"]:hover{border-color:var(--border-md)}
+  select:focus,input[type="text"]:focus{border-color:var(--P-border);box-shadow:0 0 0 3px rgba(126,184,232,.08)}
+  select option{background:var(--surface2)}
+
+  /* Search input with icon */
+  .search-wrap{position:relative}
+  .search-wrap input{padding-left:36px;padding-right:14px;cursor:text}
+  .search-wrap svg{
+    position:absolute;left:11px;top:50%;transform:translateY(-50%);
+    width:14px;height:14px;stroke:var(--muted);pointer-events:none;
+  }
+  /* dropdown list for search */
+  .dropdown-list{
+    position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:100;
+    background:var(--surface2);border:1px solid var(--border-md);
+    border-radius:var(--radius-sm);max-height:220px;overflow-y:auto;
+    display:none;
+  }
+  .dropdown-list.open{display:block}
+  .dropdown-item{
+    padding:9px 14px;font-size:13px;color:var(--text);cursor:pointer;
+    transition:background .1s;
+  }
+  .dropdown-item:hover,.dropdown-item.focused{background:var(--surface3)}
+  .dropdown-item mark{background:transparent;color:var(--P);font-weight:500}
+
+  .run-btn{
+    height:42px;padding:0 28px;border-radius:var(--radius-sm);
+    background:var(--P);color:#08080E;font-family:'DM Sans',sans-serif;
+    font-size:13.5px;font-weight:500;border:none;cursor:pointer;
+    transition:opacity .15s;white-space:nowrap;
+  }
+  .run-btn:hover{opacity:.88}
+  .run-btn:disabled{opacity:.35;cursor:not-allowed}
+
+  /* Result area */
+  #results{display:none}
+
+  /* Zone hero */
+  .zone-hero{
+    border-radius:var(--radius-lg);padding:36px 40px;
+    margin-bottom:28px;border:1px solid;
+    display:flex;align-items:center;gap:32px;
+  }
+  .zone-hero.high    {border-color:rgba(122,224,184,.3);background:rgba(122,224,184,.06)}
+  .zone-hero.emerging{border-color:rgba(232,201,122,.3);background:rgba(232,201,122,.06)}
+  .zone-hero.low     {border-color:rgba(232,122,122,.3);background:rgba(232,122,122,.06)}
+
+  .zone-icon{
+    width:60px;height:60px;border-radius:16px;
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  }
+  .high .zone-icon    {background:rgba(122,224,184,.15)}
+  .emerging .zone-icon{background:rgba(232,201,122,.15)}
+  .low .zone-icon     {background:rgba(232,122,122,.15)}
+  .zone-icon svg{width:28px;height:28px}
+  .high .zone-icon svg    {stroke:var(--high)}
+  .emerging .zone-icon svg{stroke:var(--emerging)}
+  .low .zone-icon svg     {stroke:var(--low)}
+
+  .zone-hero-text .zone-label{
+    font-size:11px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;margin-bottom:6px;
+  }
+  .high .zone-label    {color:var(--high)}
+  .emerging .zone-label{color:var(--emerging)}
+  .low .zone-label     {color:var(--low)}
+
+  .zone-hero-text h2{font-size:28px;font-weight:700;margin-bottom:4px}
+  .zone-hero-text p{font-size:13px;color:var(--muted)}
+
+  .zone-score{
+    margin-left:auto;text-align:right;flex-shrink:0;
+  }
+  .zone-score .score-big{
+    font-family:'Syne',sans-serif;font-size:48px;font-weight:800;line-height:1;
+  }
+  .high .score-big    {color:var(--high)}
+  .emerging .score-big{color:var(--emerging)}
+  .low .score-big     {color:var(--low)}
+  .zone-score .score-lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+
+  /* Context row */
+  .context-chips{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:28px}
+  .chip{
+    display:inline-flex;align-items:center;gap:7px;
+    padding:6px 14px;border-radius:100px;font-size:12.5px;
+    border:1px solid var(--border);background:var(--surface);color:var(--text);
+  }
+  .chip svg{width:13px;height:13px;stroke:var(--muted)}
+  .chip span{color:var(--muted);font-size:11px}
+
+  /* Top regions table */
+  .regions-note{font-size:12px;color:var(--muted);margin-bottom:14px}
+
+  /* Warning banner */
+  .warn-banner{
+    background:rgba(232,201,122,.08);border:1px solid rgba(232,201,122,.25);
+    border-radius:var(--radius);padding:12px 16px;
+    font-size:13px;color:var(--emerging);margin-bottom:20px;
+    display:flex;align-items:center;gap:10px;
+  }
+  .warn-banner svg{width:15px;height:15px;stroke:currentColor;flex-shrink:0}
+
+  .spinner{border-top-color:var(--P)}
+</style>
+</head>
+<body>
+
+<a class="back-btn" href="/"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>Home</a>
+
+<div class="layout">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sb-logo">
+      <div class="mark" style="background:linear-gradient(135deg,#3A8FC8,#2A6FA8)">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+        </svg>
+      </div>
+      <div class="name">epoch<span> / producer</span></div>
+    </div>
+    <div class="sb-section">
+      <p class="sb-label">Analysis</p>
+      <div class="nav-item active">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        Demand Zones
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        Markets
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Trends
+      </div>
+    </div>
+    <div class="sb-footer">epoch v0.1 · Producer</div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <div class="page-header">
+      <p class="eyebrow">Producer Intelligence</p>
+      <h1>Demand Insights</h1>
+      <p>Select a product and destination city to get demand zone predictions from the model.</p>
+    </div>
+
+    <!-- Query form -->
+    <div class="query-card">
+      <h3>Query the Model</h3>
+      <p>Choose a product and a destination city — the model will return demand insights instantly.</p>
+      <div class="input-row">
+
+        <!-- Product dropdown with search -->
+        <div class="field">
+          <label>Product</label>
+          <div class="search-wrap" id="product-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+            <input type="text" id="product-input" placeholder="Search product…" autocomplete="off"
+              oninput="filterDropdown('product')" onfocus="openDropdown('product')" onblur="blurDropdown('product')"/>
+            <div class="dropdown-list" id="product-list"></div>
+          </div>
+          <input type="hidden" id="product-value"/>
+        </div>
+
+        <!-- City dropdown with search -->
+        <div class="field">
+          <label>Destination City</label>
+          <div class="search-wrap" id="city-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            <input type="text" id="city-input" placeholder="Search city…" autocomplete="off"
+              oninput="filterDropdown('city')" onfocus="openDropdown('city')" onblur="blurDropdown('city')"/>
+            <div class="dropdown-list" id="city-list"></div>
+          </div>
+          <input type="hidden" id="city-value"/>
+        </div>
+
+        <button class="run-btn" id="run-btn" onclick="runQuery()" disabled>Get Insights</button>
+      </div>
+    </div>
+
+    <!-- Loader -->
+    <div class="loader" id="loader" style="display:none">
+      <div class="spinner"></div>
+      <p>Running demand model…</p>
+    </div>
+
+    <!-- Results -->
+    <div id="results">
+
+      <!-- Warning if no city match -->
+      <div class="warn-banner" id="warn-banner" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <span id="warn-text"></span>
+      </div>
+
+      <!-- Zone hero -->
+      <div class="zone-hero" id="zone-hero">
+        <div class="zone-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        </div>
+        <div class="zone-hero-text">
+          <p class="zone-label" id="zone-label-txt">—</p>
+          <h2 id="zone-title">—</h2>
+          <p id="zone-sub">—</p>
+        </div>
+        <div class="zone-score">
+          <div class="score-big" id="zone-score-big">—</div>
+          <div class="score-lbl">Demand Score</div>
+        </div>
+      </div>
+
+      <!-- Context chips -->
+      <div class="context-chips" id="context-chips"></div>
+
+      <!-- Stats row -->
+      <div class="stats-row" id="stats-row"></div>
+
+      <!-- Top regions -->
+      <div id="top-regions-section">
+        <p class="section-head">Top Regions for this Product</p>
+        <p class="regions-note">Global demand ranking — compare your selected city against other regions.</p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>#</th><th>Region</th><th>Demand Zone</th><th>Score</th><th>Total Sales</th><th>Orders</th></tr>
+            </thead>
+            <tbody id="regions-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div><!-- /results -->
+
+    <!-- Initial empty state -->
+    <div class="empty" id="empty-state">
+      <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      <h4>Select a product and city to begin</h4>
+      <p>The model will return demand zone insights instantly</p>
+    </div>
+
+  </main>
+</div>
+<div id="toast"></div>
+
+<script>
+  const allProducts = [];
+  const allCities   = [];
+  let   focusIdx    = {product:-1, city:-1};
+
+  /* ── Load options on page load ── */
+  async function loadOptions(){
+    try{
+      const [pRes, cRes] = await Promise.all([
+        fetch('/api/predict/options/products'),
+        fetch('/api/predict/options/cities'),
+      ]);
+      const pData = await pRes.json();
+      const cData = await cRes.json();
+      allProducts.push(...(pData.products||[]));
+      allCities.push(...(cData.cities||[]));
+      renderList('product', allProducts);
+      renderList('city',    allCities);
+    }catch(e){
+      showToast('Could not load options — is the backend running?','error');
+    }
+  }
+
+  /* ── Searchable dropdown logic ── */
+  function renderList(type, items, query=''){
+    const list = document.getElementById(`${type}-list`);
+    const q    = query.toLowerCase();
+    const filtered = items.filter(i=>i.toLowerCase().includes(q)).slice(0,80);
+    list.innerHTML = filtered.map((item,idx)=>`
+      <div class="dropdown-item" data-val="${escHtml(item)}" data-idx="${idx}"
+           onmousedown="selectItem('${type}','${escJs(item)}')">${highlight(item,q)}</div>
+    `).join('') || `<div class="dropdown-item" style="color:var(--muted)">No results</div>`;
+  }
+
+  function filterDropdown(type){
+    const q = document.getElementById(`${type}-input`).value;
+    const src = type==='product'?allProducts:allCities;
+    renderList(type, src, q);
+    document.getElementById(`${type}-list`).classList.add('open');
+    document.getElementById(`${type}-value`).value = '';
+    checkReady();
+  }
+
+  function openDropdown(type){
+    filterDropdown(type);
+  }
+
+  function blurDropdown(type){
+    setTimeout(()=>{
+      document.getElementById(`${type}-list`).classList.remove('open');
+    },180);
+  }
+
+  function selectItem(type, val){
+    document.getElementById(`${type}-input`).value = val;
+    document.getElementById(`${type}-value`).value = val;
+    document.getElementById(`${type}-list`).classList.remove('open');
+    checkReady();
+  }
+
+  function checkReady(){
+    const p = document.getElementById('product-value').value;
+    const c = document.getElementById('city-value').value;
+    document.getElementById('run-btn').disabled = !(p && c);
+  }
+
+  function highlight(text, q){
+    if(!q) return escHtml(text);
+    const re  = new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})`, 'gi');
+    return escHtml(text).replace(re,'<mark>$1</mark>');
+  }
+
+  /* ── Run query ── */
+  async function runQuery(){
+    const product = document.getElementById('product-value').value;
+    const city    = document.getElementById('city-value').value;
+    if(!product||!city) return;
+
+    document.getElementById('empty-state').style.display='none';
+    document.getElementById('results').style.display='none';
+    document.getElementById('loader').style.display='flex';
+
+    try{
+      const res  = await fetch('/api/predict/demand',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({product,city})
+      });
+      const data = await res.json();
+      if(data.error) throw new Error(data.error);
+      renderResults(data);
+    }catch(err){
+      showToast(err.message||'Query failed','error');
+      document.getElementById('empty-state').style.display='block';
+    }finally{
+      document.getElementById('loader').style.display='none';
+    }
+  }
+
+  /* ── Render results ── */
+  function renderResults(d){
+    // Warning banner
+    const wb = document.getElementById('warn-banner');
+    if(d.message){ wb.style.display='flex'; document.getElementById('warn-text').textContent=d.message; }
+    else          { wb.style.display='none'; }
+
+    // Zone hero
+    const zoneClass = d.demand_zone==='High Demand'?'high':d.demand_zone==='Emerging Market'?'emerging':'low';
+    const hero = document.getElementById('zone-hero');
+    hero.className = `zone-hero ${zoneClass}`;
+
+    document.getElementById('zone-label-txt').textContent = d.demand_zone||'—';
+    document.getElementById('zone-title').textContent     = `${d.product} in ${d.city}`;
+    document.getElementById('zone-sub').textContent       = `${d.region} · ${d.market}`;
+    document.getElementById('zone-score-big').textContent = d.demand_score!=null ? Math.round(d.demand_score*100)+'%' : '—';
+
+    // Context chips
+    document.getElementById('context-chips').innerHTML = [
+      {icon:'<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>',  label:'City',    val:d.city},
+      {icon:'<circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10z"/>',  label:'Market',  val:d.market},
+      {icon:'<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',                                label:'Region',  val:d.region},
+      {icon:'<rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/>',  label:'Orders',  val:d.order_count},
+    ].map(c=>`
+      <div class="chip">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${c.icon}</svg>
+        <span>${c.label}</span> ${escHtml(String(c.val||'—'))}
+      </div>
+    `).join('');
+
+    // Stats
+    document.getElementById('stats-row').innerHTML = `
+      <div class="stat-card"><div class="label">Total Sales</div><div class="value">$${fmt(d.total_sales)}</div></div>
+      <div class="stat-card"><div class="label">Avg Profit / Order</div><div class="value">$${(d.avg_profit||0).toFixed(1)}</div></div>
+      <div class="stat-card"><div class="label">Late Delivery Risk</div><div class="value">${Math.round((d.avg_late_risk||0)*100)}%</div></div>
+      <div class="stat-card"><div class="label">Historical Orders</div><div class="value">${fmt(d.order_count)}</div></div>
+    `;
+
+    // Top regions table
+    const regions = d.top_regions||[];
+    document.getElementById('regions-tbody').innerHTML = regions.map((r,i)=>{
+      const zc    = r.demand_zone==='High Demand'?'high':r.demand_zone==='Emerging Market'?'emerging':'low';
+      const pct   = Math.round((r.demand_score||0)*100);
+      const isCur = r.region === d.region;
+      return `<tr style="${isCur?'background:var(--surface2)':''}">
+        <td class="td-muted td-mono">${i+1}</td>
+        <td>${escHtml(r.region)} ${isCur?'<span style="font-size:10px;color:var(--P)">← selected</span>':''}</td>
+        <td><span class="badge badge-${zc}">${r.demand_zone}</span></td>
+        <td>
+          <div class="score-bar">
+            <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:var(--${zc==='high'?'high':zc==='emerging'?'emerging':'low'})"></div></div>
+            <span class="score-num">${pct}%</span>
+          </div>
+        </td>
+        <td class="td-mono">$${fmt(r.total_sales)}</td>
+        <td class="td-mono">${fmt(r.order_count)}</td>
+      </tr>`;
+    }).join('') || `<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px">No region data available</td></tr>`;
+
+    document.getElementById('results').style.display='block';
+  }
+
+  /* ── Helpers ── */
+  function fmt(n){ return Number(n||0).toLocaleString(undefined,{maximumFractionDigits:0}) }
+  function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
+  function escJs(s)  { return s.replace(/'/g,"\\'") }
+  function showToast(msg,type=''){
+    const t=document.getElementById('toast');
+    t.textContent=msg; t.className=`show ${type}`;
+    setTimeout(()=>t.className='',3500);
+  }
+
+  loadOptions();
+</script>
+</body>
+</html>

@@ -1,0 +1,31 @@
+app:
+  name: "epoch"
+  version: "0.1.0"
+  port: 5000
+  debug: true
+
+apis:
+  openweather_key: "YOUR_OPENWEATHERMAP_KEY_HERE"
+  newsapi_key: "YOUR_NEWSAPI_KEY_HERE"
+
+model:
+  cluster_model_path:  "saved_models/cluster_model.pkl"
+  delay_model_path:    "saved_models/delay_model.pkl"
+  risk_model_path:     "saved_models/risk_model.pkl"
+  demand_score_weights:
+    sales:    0.40
+    quantity: 0.30
+    profit:   0.20
+    risk_inv: 0.10
+
+thresholds:
+  high_demand_percentile:    0.67
+  low_demand_percentile:     0.33
+  risk_critical:             75
+  risk_high:                 50
+  risk_medium:               25
+  delay_gap_warning_days:    2
+
+upload:
+  max_size_mb: 50
+  allowed_extensions: ["csv"]
