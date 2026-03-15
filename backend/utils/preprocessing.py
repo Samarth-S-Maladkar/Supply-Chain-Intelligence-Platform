@@ -109,7 +109,7 @@ def load_and_clean_csv(filepath: str) -> pd.DataFrame:
     # Parse dates
     for col in DATE_COLS:
         if col in df.columns:
-            df[col] = pd.to_datetime(df[col], errors="coerce", infer_datetime_format=True)
+            df[col] = pd.to_datetime(df[col], errors="coerce")
 
     # Drop fully empty rows
     df = df.dropna(how="all")

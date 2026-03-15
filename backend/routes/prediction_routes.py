@@ -116,7 +116,6 @@ def _get_dataset():
     if _dataset_cache is not None:
         return _dataset_cache
 
-    import pandas as pd
     from backend.utils.preprocessing import load_and_clean_csv
 
     def _iter_csv_paths(base_folder: str):
